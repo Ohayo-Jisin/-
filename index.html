@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="おはよう地震速報">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>おはよう地震速報</title>
+<style>
+:root{
+  --bg:#0c1018; --panel:#151b27; --ink:#e9eef5; --sub:#98a4b6; --line:#27303f;
+  --go:#f0a640; --go-ink:#2a1700; --alert:#c8321f; --alert-ink:#fff;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){--bg:#f6f1e8;--panel:#fff;--ink:#1a2030;--sub:#5d6677;--line:#ddd6c8;--go:#e08a14;}
+}
+:root[data-theme="light"]{--bg:#f6f1e8;--panel:#fff;--ink:#1a2030;--sub:#5d6677;--line:#ddd6c8;--go:#e08a14;}
+:root[data-theme="dark"]{--bg:#0c1018;--panel:#151b27;--ink:#e9eef5;--sub:#98a4b6;--line:#27303f;--go:#f0a640;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);touch-action:manipulation;
+  font-family:-apple-system,"Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;line-height:1.7}
+main{max-width:520px;margin:0 auto;padding:22px 18px 40px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:1.35rem;margin:0}
+.tag{font-size:.85rem;color:var(--sub);margin:2px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.panel p{margin:0}
+button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);color:var(--ink);background:var(--panel);padding:13px 16px;min-height:48px}
+button:focus-visible{outline:3px solid #5aa9ff;outline-offset:3px}
+.go{background:var(--go);color:var(--go-ink);border-color:transparent;font-size:1.3rem;font-weight:700;padding:26px 16px}
+.state{font-size:1.05rem;font-weight:700}
+.dot{display:inline-block;width:.65em;height:.65em;border-radius:50%;background:var(--go);margin-right:.5em}
+.small{font-size:.85rem;color:var(--sub)}
+details button{display:block;width:100%;margin-top:8px}details textarea{width:100%;margin-top:6px;font-size:.75rem;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px}.dot.off{background:var(--sub)}.warn{color:#ffb56b;font-weight:700}
+#firm{position:fixed;top:0;left:0;right:0;z-index:27;background:#a52a1f;color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:.9rem;line-height:1.5}#firm button{min-height:36px;padding:6px 12px;background:#fff;color:#7a1a0e}
+#help{position:fixed;top:0;left:0;right:0;bottom:0;z-index:8;background:var(--bg);color:var(--ink);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(18px + env(safe-area-inset-top,0px)) 18px calc(28px + env(safe-area-inset-bottom,0px))}#help .in{max-width:520px;margin:0 auto}#help h2{font-size:1.25rem;margin:0 0 6px}#help h3{font-size:1.02rem;margin:20px 0 4px;border-left:5px solid var(--go);padding-left:8px}#help p,#help li{font-size:.92rem;margin:4px 0}#help ul{padding-left:1.2em;margin:4px 0}
+#soft{position:fixed;top:0;left:0;right:0;z-index:25;background:#e6eef7;color:#1b2b3c;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:.9rem;line-height:1.5}#soft button{min-height:36px;padding:6px 12px;background:#fff;color:#1b2b3c}
+#tsu{position:fixed;top:0;left:0;right:0;z-index:30;background:#0b4f8a;color:#fff;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 10px;display:flex;flex-direction:column;gap:8px;font-weight:700}#tsu button{background:#fff;color:#0b3a66;border:0;font-weight:800;min-height:44px}
+ul.tips{margin:0;padding-left:1.2em;font-size:.9rem;color:var(--sub)}
+[hidden]{display:none!important}
+
+#alert{position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;background:var(--alert);color:var(--alert-ink);
+  padding:calc(24px + env(safe-area-inset-top,0px)) 20px calc(24px + env(safe-area-inset-bottom,0px));
+  display:flex;flex-direction:column;justify-content:space-between;animation:pulse 1s steps(2,jump-none) infinite}
+@keyframes pulse{50%{background:#8f1f12}}
+@media (prefers-reduced-motion:reduce){#alert{animation:none}}
+/* 小さいスマホでも操作ボタンが隠れない警報レイアウト */
+#alert{gap:10px;justify-content:flex-start;padding:calc(12px + env(safe-area-inset-top,0px)) 14px calc(10px + env(safe-area-inset-bottom,0px));height:100dvh;min-height:0}
+#alert>div:first-child{min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1 1 auto}
+#alert h2{font-size:clamp(1.3rem,5vw,1.65rem)}
+#alert p{font-size:.85rem;margin:.2em 0 0}
+#alert .bulletin{font-size:1rem}
+#alert .change-notice{font-size:.9rem;min-height:0}
+#alert .al-rows{gap:5px;margin:8px 0 0}
+#alert .al-rows div{padding-top:5px}
+#alert .al-rows dt{font-size:.8rem}
+#alert .al-rows dd{font-size:clamp(1.45rem,6vw,1.85rem);line-height:1.15}
+#alert #alert-count{font-size:1rem;margin:7px 0}
+#alert #alert-count b{font-size:clamp(2.8rem,13vw,4.2rem);line-height:1.05}
+#alert #ack{flex:0 0 auto;padding:12px 8px;min-height:58px;font-size:1.2rem;position:relative;z-index:1}
+
+/* 操作ボタンを画面下端から十分上に配置（ホームバーとの干渉を防止） */
+#alert{padding-bottom:calc(95px + env(safe-area-inset-bottom,0px))}
+#alert #ack{margin-top:0;min-height:62px}
+#alert h2{font-size:2rem;margin:0}
+#alert p{margin:.5em 0 0;opacity:.92}
+#ack{background:#fff;color:#7a1a0e;border:0;font-size:1.6rem;font-weight:800;padding:46px 12px;width:100%}
+
+.bulletin{font-weight:800;font-size:1.2rem;letter-spacing:.04em;color:var(--go)}
+#alert .bulletin{color:#fff} .change-notice{font-weight:800;font-size:1.05rem;min-height:1.5em}
+.al-rows{display:grid;gap:12px;margin:18px 0 0}
+.al-rows div{border-top:1px solid rgba(255,255,255,.45);padding-top:10px}
+.al-rows dt{font-size:.95rem;opacity:.92}
+.al-rows dd{margin:0;font-size:2.4rem;font-weight:800;line-height:1.2}
+.do{font-size:1.35rem;font-weight:800;line-height:1.5;border-left:6px solid var(--go);padding-left:12px}
+#alert-count{font-size:1.3rem;text-align:center;margin:18px 0;font-weight:700}
+#alert-count b{display:block;font-size:clamp(4rem,18vw,7rem);line-height:1.15;font-variant-numeric:tabular-nums;color:#fff}
+.count{text-align:center}
+.count b{font-size:4rem;line-height:1;color:var(--go);font-variant-numeric:tabular-nums}
+.rows{display:grid;gap:12px;margin:0}
+.rows div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;border-top:1px solid var(--line);padding-top:10px}
+.rows dt{color:var(--sub);font-size:.9rem}
+.rows dd{margin:0;font-size:1.4rem;font-weight:700;text-align:right}
+.row-btns{display:flex;gap:10px}.row-btns button{flex:1}
+.region-picker{display:grid;gap:6px}.region-picker label{font-size:.9rem;font-weight:700}.region-picker select{width:100%;min-height:46px;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:inherit}.small-btn{min-height:34px;padding:3px 10px;font-size:.85rem}#alert{overflow:hidden;gap:12px}#alert>div{min-height:0;overflow-y:auto}#ack{flex-shrink:0;padding:18px 12px;font-size:1.2rem}#alert h2{font-size:1.45rem}.al-rows{gap:7px;margin-top:8px}.al-rows div{padding-top:6px}.al-rows dd{font-size:clamp(1.3rem,6vw,1.9rem)}#alert-count{margin:8px 0;font-size:1rem}#alert-count b{font-size:clamp(2.6rem,13vw,4rem)}
+
+/* 時計切替ボタンを監視中の先頭に目立たせる */
+#watching #clock-open{order:-1;background:#233952;color:#fff;border:2px solid #7296bf;font-weight:800;font-size:1.15rem;min-height:64px;box-shadow:0 0 0 2px rgba(114,150,191,.12)}
+/* 監視を継続したまま表示するナイトクロック */
+#night-clock{position:fixed;inset:0;z-index:5;background:#03060c;color:#d8e5f5;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) 16px calc(32px + env(safe-area-inset-bottom,0px));text-align:center}
+#night-clock[hidden]{display:none!important}
+#clock-time{font-size:clamp(4rem,17vw,7rem);font-weight:650;letter-spacing:.015em;line-height:1.2;font-variant-numeric:tabular-nums}
+#clock-date{font-size:clamp(1rem,4vw,1.35rem);color:#8b9bb2;margin-top:12px}
+#clock-status{font-size:.9rem;color:#8ca89c;margin-top:32px}
+#clock-return{position:absolute;bottom:calc(42px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:#182332;color:#dce9f7;border:1px solid #40516a;min-width:210px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h1>おはよう地震速報</h1><button id="help-open" type="button" class="small-btn">ヘルプ</button></div>
+    <p class="tag">緊急地震速報(警報)を受信して、音と声で知らせます。</p>
+  </header>
+
+  <section id="idle" class="panel">
+    <p>寝る前に「監視を始める」を押して、この画面を開いたまま充電してください。</p>
+    <div class="region-picker" id="region-box"><label for="pref-select">都道府県</label><select id="pref-select"></select><label for="area-select">監視する地域</label><select id="area-select"></select><p class="small">選択した地域はこの端末に保存されます。細かい地域名が速報と一致しない場合があるので、迷ったら「（全域）」を選ぶのが確実です。</p></div>
+    <button id="start" class="go" type="button">監視を始める</button>
+    <p class="small">補助用のアプリです。スマホ標準の緊急地震速報の通知も、必ずオンにしておいてください。</p>
+    <ul class="tips">
+      <li>iPhone: 設定の「画面表示と明るさ」で、自動ロックを「なし」にする</li>
+      <li>iPhone: 消音スイッチ(サイレント)を切っておく</li>
+      <li>監視を始めたら、「音と声のテスト」を押して、音が出ることを確認する</li>
+      <li>Safariの共有ボタンから「ホーム画面に追加」すると、全画面で使えます</li>
+    </ul>
+  </section>
+
+  <section id="watching" class="panel" hidden>
+    <p class="state"><span class="dot off" id="dot"></span><span id="connmsg">接続中…</span></p>
+    <p id="lockmsg" class="small"></p>
+    <p id="audiomsg" class="small warn" hidden></p>
+    <button id="mode-btn" type="button"></button>
+    <p id="testwarn" class="small warn" hidden>テストモード中です。本番の地震速報は届きません。ダミーの地震が流れてきます。</p>
+    <button id="soft-btn" type="button"></button>
+    <p id="softmsg" class="small"></p>
+    <button id="firm-btn" type="button"></button>
+    <p class="small">監視地域：<strong id="watch-area"></strong> <button id="change-region" type="button" class="small-btn">地域変更</button></p>
+    <div id="region-slot" hidden></div>
+    <p class="small">デモ: 本番と同じ受信処理に、作り物の速報を流します。選んだ地域に合わせて動きます（実際の地震ではありません）</p>
+    <button id="test-sound" type="button">音と声のテスト</button>
+    <button id="fk1" type="button">デモ: 自分の地域が揺れる(約25秒)</button>
+    <button id="fk2" type="button">デモ: 時間に余裕がある(約70秒)</button>
+    <button id="fk3" type="button">デモ: すでに揺れが到達</button>
+    <button id="fk5" type="button">デモ: 取り消し</button>
+    <button id="fk6" type="button">デモ: 津波警報(自分の県)</button>
+    <button id="fk7" type="button">デモ: 津波の解除</button>
+    <button id="fk8" type="button">デモ: 地震情報(震度3・やわらかい通知)</button>
+    <button id="fk9" type="button">デモ: 他の地域だけ震度5弱以上(かたい通知)</button>
+    <button id="fk10" type="button">デモ: 他の地域の続報(強まる)</button>
+    <button id="fk11" type="button">デモ: 続報で自分の地域も震度4以上</button>
+    <details>
+      <summary class="small">受信の記録(コードごとの件数と、最後の生データ)</summary>
+      <p class="small">形式の確認に使います。</p>
+      <textarea id="raw" readonly rows="6"></textarea>
+    </details>
+    <button id="clock-open" class="clock-switch" type="button">◷ 時計モードに切り替える</button>
+    <button id="stop" type="button">監視をやめる</button>
+  </section>
+
+  <section id="report" class="panel" hidden>
+    <p class="state" id="rep-title">地震の内容</p>
+    <p id="rep-number" class="bulletin"></p>
+    <p id="rep-change" class="change-notice" aria-live="polite"></p>
+    <p id="do" class="do"></p>
+    <p id="countbox" class="count">揺れまで 約 <b id="n">0</b> 秒</p>
+    <dl class="rows">
+      <div><dt>あなたの地域<br><span class="small">(<span id="report-area">千葉県北西部</span>)</span></dt><dd id="r-local"></dd></div>
+      <div><dt>速報対象地域の最大予想震度</dt><dd id="r-japan"></dd></div>
+      <div><dt>震源</dt><dd id="r-src"></dd></div>
+      <div><dt>マグニチュード（推定）</dt><dd id="r-mag"></dd></div>
+    </dl>
+    <div class="row-btns">
+      <button id="again" type="button">もう一度読む</button>
+      <button id="back" type="button">監視に戻る</button>
+    </div>
+    <p class="small">予想震度は速報の時点での推定です。到達時刻が不明な場合は秒数を表示しません。揺れを感じたら、まず身の安全を確保してください。</p>
+  </section>
+</main>
+
+<div id="night-clock" hidden aria-label="時計画面・地震速報の監視は継続中">
+  <div id="clock-time">--:--:--</div>
+  <div id="clock-date"></div>
+  <div id="clock-status">● 地震速報を監視中</div>
+  <button id="clock-return" type="button">監視画面に戻る</button>
+</div>
+
+<div id="firm" role="status" hidden><span id="firm-text"></span><button id="firm-x" type="button">閉じる</button></div>
+
+<div id="help" hidden><div class="in">
+  <h2>ヘルプ</h2>
+  <p>おはよう地震速報は、緊急地震速報などを受信して、音と声で知らせる補助用のアプリです。スマホ標準の緊急地震速報の通知も、必ずオンにしておいてください。</p>
+  <h3>寝る前の準備</h3>
+  <ul><li>地域を選ぶ(迷ったら「(全域)」が確実です)</li><li>「監視を始める」を押す(音を使えるようにするために必要です)</li><li>「音と声のテスト」で、音が出るか確認する</li><li>接続先が「本番」になっているか確認する</li><li>画面を点けたまま、充電する。iPhoneは、設定で自動ロックを「なし」にして、消音スイッチを切っておく</li></ul>
+  <h3>警報(緊急地震速報)</h3>
+  <p>どこかで震度5弱以上が予想されると出ます。警報音が鳴り、画面に「あなたの地域」と「全国の最大震度」が出ます。ボタンを押すと、「あと◯秒」、行動の指示、内容の順に読み上げます。到達時刻が速報に入っていないときは「不明」と出ます。続報で自分の地域の予想が強まったら、もう一度鳴ります。取り消しにも対応しています。</p>
+  <h3>行動の指示(残り時間で変わります)</h3>
+  <ul><li>5秒以下: 枕で頭を守る</li><li>25秒以下: 枕で頭を守りながら、丈夫な机の下へ</li><li>39秒以下: ドアを開けて出口を確保し、机の下で頭を守る</li><li>40秒以上: 外へ逃げる(建物や塀、ガラスから離れた広い場所へ)</li></ul>
+  <h3>かたい通知</h3>
+  <p>「監視中」の画面で、オンとオフを切り替えます。<b>オフ</b>(最初の設定)では、どの警報も警報音で知らせます。<b>オン</b>にすると、自分の地域が震度4以上でない警報のときは、警報音の代わりに、赤いバーと短い音だけで知らせます(読み上げはありません)。続報のたびに、バーの「第◯報」と内容が更新されます。そのあと自分の地域が震度4以上になったら、警報を鳴らします。</p>
+  <h3>やわらかい通知</h3>
+  <p>日本のどこかで、最大震度3以上の地震情報が届いたとき、薄い青のバーとやわらかい音で知らせます。オンとオフは、「監視中」の画面で切り替えます。</p>
+  <h3>津波</h3>
+  <p>自分の県に津波警報・注意報が出ると、画面の上に青いバーが出て、警報音が鳴ります。「確認して読み上げ」で、内容を聞けます。</p>
+  <h3>時計モード</h3>
+  <p>夜用の暗い時計の画面です。監視は続いています。警報が出ると、自動で警報の画面に切り替わります。</p>
+  <h3>本番とテスト</h3>
+  <p>「接続先」のボタンで切り替えます。テストの間は、画面に警告が出て、ダミーの地震が流れてきます。ページを開き直すか「監視をやめる」を押すと、必ず本番に戻ります。寝る前には、「本番」になっていることを確認してください。</p>
+  <h3>デモのボタン</h3>
+  <p>本番と同じ受信処理に、作り物の速報を流します(実際の地震ではありません)。選んだ地域に合わせて動きます。揺れる、時間に余裕がある、すでに到達、取り消し、津波、地震情報、かたい通知とその続報を試せます。</p>
+  <h3>知っておいてほしいこと</h3>
+  <ul><li>震源が近いと、速報は揺れに間に合わないことがあります</li><li>警報が出ない地震(最大震度が小さいもの)は、速報では来ません</li><li>「強い揺れの予想なし」は、震度5弱未満の予想という意味で、揺れないという意味ではありません</li><li>他のアプリを開いても動くように、無音の音声を再生しています。他のアプリの音楽が止まることがあります</li><li>P2Pには、同じ回線からの接続は2つまで、履歴の取得は1分に60回まで、という制限があります。このアプリは、接続を1つだけ使い(切り替えの一瞬だけ2つ)、履歴の取得は、つなぎ直したときに20秒に1回までにしています。同じ回線の別の端末や別のタブでも使っていると、接続が断られることがあります</li><li>P2Pは接続を約10分で切るため、8分半ごとに、切れる前に新しい接続へ自動で切り替えます。切れたときは、すぐにつなぎ直して、その間に出た警報を、履歴から拾います</li><li>接続が切れたときは、「監視中」の画面に出ます。寝る前に、接続の表示を確認してください</li></ul>
+  <button id="help-close" type="button" style="width:100%;margin-top:18px">閉じる</button>
+</div></div>
+
+<div id="soft" role="status" hidden><span id="soft-text"></span><button id="soft-x" type="button">閉じる</button></div>
+
+<div id="tsu" role="alert" hidden><span id="tsu-text"></span><button id="tsu-ok" type="button">確認して読み上げ</button></div>
+
+<div id="alert" role="alertdialog" aria-live="assertive" aria-label="地震の速報" hidden>
+  <div>
+    <h2 id="alert-title">地震の速報</h2>
+    <p id="alert-number" class="bulletin"></p>
+    <p id="alert-change" class="change-notice" aria-live="off"></p>
+    <p>下のボタンを押すと、行動の指示と内容を読み上げます。</p>
+    <dl class="al-rows">
+      <div><dt>あなたの地域(<span id="alert-area">千葉県北西部</span>)</dt><dd id="a-local"></dd></div>
+      <div><dt>速報対象地域の最大予想震度</dt><dd id="a-japan"></dd></div>
+      <div><dt>マグニチュード（推定）</dt><dd id="a-mag"></dd></div>
+    </dl>
+    <div id="alert-count" role="timer" aria-live="off" hidden>揺れまで あと <b id="alert-seconds">0</b> 秒</div>
+  </div>
+  <button id="ack" type="button">押して内容を聞く</button>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LV = ["0","1","2","3","4","5弱","5強","6弱","6強","7"];
+const REGIONS = {"北海道":["石狩地方北部","石狩地方中部","石狩地方南部","渡島地方東部","渡島地方西部","檜山地方","後志地方北部","後志地方東部","後志地方西部","空知地方北部","空知地方中部","空知地方南部","上川地方北部","上川地方中部","上川地方南部","留萌地方中北部","留萌地方南部","宗谷地方北部","宗谷地方南部","宗谷地方利尻・礼文","網走地方","北見地方","紋別地方","胆振地方西部","胆振地方中東部","日高地方西部","日高地方中部","日高地方東部","十勝地方北部","十勝地方中部","十勝地方南部","釧路地方北部","釧路地方中南部","根室地方北部","根室地方中部","根室地方南部"],"青森県":["青森県津軽北部","青森県津軽南部","青森県三八上北","青森県下北"],"岩手県":["岩手県内陸北部","岩手県内陸南部","岩手県沿岸北部","岩手県沿岸南部"],"宮城県":["宮城県北部","宮城県中部","宮城県南部"],"秋田県":["秋田県沿岸北部","秋田県沿岸南部","秋田県内陸北部","秋田県内陸南部"],"山形県":["庄内","最上","村山","置賜"],"福島県":["中通り","浜通り","会津"],"茨城県":["茨城県北部","茨城県南部"],"栃木県":["栃木県北部","栃木県南部"],"群馬県":["群馬県北部","群馬県南部"],"埼玉県":["埼玉県北部","埼玉県南部","埼玉県秩父地方"],"千葉県":["千葉県北東部","千葉県北西部","千葉県南部"],"東京都":["東京都２３区","東京都多摩東部","東京都多摩西部","伊豆大島","新島","神津島","三宅島","八丈島","小笠原"],"神奈川県":["神奈川県東部","神奈川県西部"],"新潟県":["新潟県上越","新潟県中越","新潟県下越","佐渡"],"富山県":["富山県東部","富山県西部"],"石川県":["能登","加賀"],"福井県":["嶺北","嶺南"],"山梨県":["山梨県中・西部","山梨県東部・富士五湖"],"長野県":["長野県北部","長野県中部","長野県南部"],"岐阜県":["美濃東部","美濃中西部","飛騨"],"静岡県":["伊豆","静岡県東部","静岡県中部","静岡県西部"],"愛知県":["愛知県東部","愛知県西部"],"三重県":["三重県北部","三重県中部","三重県南部"],"滋賀県":["滋賀県北部","滋賀県南部"],"京都府":["京都府北部","京都府南部"],"大阪府":["大阪府北部","大阪府南部"],"兵庫県":["兵庫県北部","兵庫県南東部","兵庫県南西部","淡路島"],"奈良県":[],"和歌山県":["和歌山県北部","和歌山県南部"],"鳥取県":["鳥取県東部","鳥取県中部","鳥取県西部"],"島根県":["島根県東部","島根県西部","隠岐"],"岡山県":["岡山県北部","岡山県南部"],"広島県":["広島県北部","広島県南東部","広島県南西部"],"山口県":["山口県北部","山口県東部","山口県中部","山口県西部"],"徳島県":["徳島県北部","徳島県南部"],"香川県":["香川県東部","香川県西部"],"愛媛県":["東予","中予","南予"],"高知県":["高知県東部","高知県中部","高知県西部"],"福岡県":["福岡地方","北九州地方","筑豊地方","筑後地方"],"佐賀県":["佐賀県北部","佐賀県南部"],"長崎県":["長崎県北部","長崎県南西部","長崎県島原半島","壱岐","対馬","五島"],"熊本県":["熊本県阿蘇地方","熊本県熊本地方","熊本県球磨地方","熊本県天草・芦北地方"],"大分県":["大分県北部","大分県中部","大分県南部","大分県西部"],"宮崎県":["宮崎県北部平野部","宮崎県北部山沿い","宮崎県南部平野部","宮崎県南部山沿い"],"鹿児島県":["薩摩地方","大隅地方","種子島","屋久島","奄美大島","喜界島","徳之島","沖永良部島","与論島"],"沖縄県":["沖縄本島北部","沖縄本島中南部","久米島","大東島","宮古島","石垣島","竹富島","与那国島"]};
+let selectedPref = "千葉県", selectedArea = "千葉県北西部";
+try { const saved = JSON.parse(localStorage.getItem("eew-region-v1") || "null"); if(saved && REGIONS[saved.pref] && (saved.area === saved.pref || REGIONS[saved.pref].includes(saved.area))) { selectedPref=saved.pref; selectedArea=saved.area; } }catch(e){}
+function setRegionUI() {
+  $("pref-select").innerHTML = Object.keys(REGIONS).map(x=>`<option value="${x}">${x}</option>`).join("");
+  $("pref-select").value=selectedPref;
+  renderAreaOptions();
+}
+function renderAreaOptions() {
+  $("area-select").innerHTML = [selectedPref,...REGIONS[selectedPref]].map(x=>`<option value="${x}">${x===selectedPref ? x+"（全域）" : x}</option>`).join("");
+  $("area-select").value=selectedArea;
+  $("watch-area").textContent=selectedArea;
+  $("report-area").textContent=selectedArea;
+  $("alert-area").textContent=selectedArea;
+}
+function saveRegion() { try{localStorage.setItem("eew-region-v1",JSON.stringify({pref:selectedPref,area:selectedArea}));}catch(e){} renderAreaOptions(); }
+$("pref-select").addEventListener("change",e=>{selectedPref=e.target.value;selectedArea=selectedPref;saveRegion();});
+$("area-select").addEventListener("change",e=>{selectedArea=e.target.value;saveRegion();});
+$("change-region").addEventListener("click",()=>{
+  if(!$("alert").hidden) return;
+  const slot = $("region-slot"), box = $("region-box");
+  if(slot.hidden){ slot.appendChild(box); slot.hidden = false; $("change-region").textContent = "閉じる"; }
+  else{ $("idle").insertBefore(box, $("start")); slot.hidden = true; $("change-region").textContent = "地域変更"; }
+});
+setRegionUI();
+
+const PLACES = [["北海道東方沖",43.0,147.5],["青森県東方沖",41.0,142.5],["岩手県沖",39.5,142.5],["宮城県沖",38.2,142.2],
+  ["福島県沖",37.3,141.8],["茨城県南部",36.0,140.1],["東京湾",35.5,139.9],["神奈川県西部",35.3,139.1],["駿河湾",34.8,138.5],
+  ["能登半島沖",37.5,137.0],["愛知県西部",35.0,137.0],["紀伊水道",34.0,135.0],["兵庫県南部",34.7,135.0],
+  ["高知県沖",32.8,134.0],["熊本県熊本地方",32.8,130.8],["沖縄本島近海",26.5,127.8],["茨城県沖",36.2,141.0],["三陸沖",38.1,143.0]];
+let ctx = null, beepTimer = null, countTimer = null, lock = null, watching = false, beepCount = 0;
+let scene = null, remain = 0, alertTimer = null, deadlineMs = 0;
+let demoTimers = [], demoActive = false;
+
+const HOME = {lat:35.6, lon:140.1};
+function dist(la, lo){
+  const r = Math.PI/180, a = Math.sin((la-HOME.lat)*r/2)**2 + Math.cos(HOME.lat*r)*Math.cos(la*r)*Math.sin((lo-HOME.lon)*r/2)**2;
+  return 12742*Math.asin(Math.sqrt(a));
+}
+function make(p, maxIdx, km){
+  // デモ用の目安。震源との距離(km)から、揺れまでの秒数と地域の震度を概算します。実際の予測ではありません。
+  const d = km || dist(p[1], p[2]);
+  const li = maxIdx - Math.floor(d/80);
+  return {src:p[0], maxIdx, li: li >= 5 ? li : null, eta: Math.max(1, Math.round(d/3.5 - 10)), demo:true, magnitude:Number((5.5 + maxIdx*0.16).toFixed(1))};
+}
+const pick = name => PLACES.find(p => p[0] === name);
+
+function show(id){ ["idle","watching","report"].forEach(k => { $(k).hidden = (k !== id); }); if(id !== "watching") $("night-clock").hidden = true; }
+function updateClock(){
+  const now = new Date();
+  $("clock-time").textContent = now.toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  $("clock-date").textContent = now.toLocaleDateString("ja-JP",{month:"long",day:"numeric",weekday:"long"});
+  $("clock-status").textContent = watching ? "● " + $("connmsg").textContent : "監視停止中";
+  $("clock-status").style.color = ws && ws.readyState === 1 ? "#8ca89c" : "#ffb56b";
+}
+$("clock-open").addEventListener("click",()=>{ if(!watching)return; updateClock(); $("night-clock").hidden=false; });
+$("clock-return").addEventListener("click",()=>{ $("night-clock").hidden=true; });
+setInterval(()=>{if(!$("night-clock").hidden)updateClock();},1000);
+
+async function takeLock(){
+  try{
+    if(!("wakeLock" in navigator)) throw 0;
+    lock = await navigator.wakeLock.request("screen");
+    $("lockmsg").textContent = "画面は点いたままになります。充電しながら使ってください。";
+  }catch(e){
+    $("lockmsg").textContent = "画面の自動消灯を止められませんでした。設定で自動ロックを「なし」にしてください。";
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if(watching && document.visibilityState === "visible"){
+    takeLock();
+    // 眠っている間に死んだ接続は、すぐに作り直す
+    if(ws && ws.readyState === 1 && Date.now() - lastMsg > 60000){ $("audiomsg").textContent = "別のアプリを開いていた間、接続が止まっていた可能性があります。つなぎ直しました。"; $("audiomsg").hidden = false; try{ ws.close(); }catch(e){} }
+    else if(!ws || ws.readyState > 1) connect();
+    reviveAudio();
+  }
+});
+
+function beep(){
+  if(!ctx) return;
+  const t = ctx.currentTime, f = (beepCount++ % 2) ? 620 : 980;
+  [f, f*1.414].forEach((hz, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = i ? "sawtooth" : "square"; o.frequency.value = hz;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.7, t + 0.01);
+    g.gain.setValueAtTime(0.7, t + 0.16);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.22);
+  });
+}
+/* ===== 他のアプリを開いても動き続けるための対策(iPhone) =====
+   無音の音声を、ずっと再生しておく。再生中のページは、iPhoneに眠らされにくい。
+   警報音も、この再生中の <audio> から鳴らす(WebAudioは、眠ると使えなくなるため) */
+let keepEl = null, ALARM_URL = "", SILENT_URL = "", CHIME_URL = "", FIRM_URL = "", alarmOnEl = false;
+function wavURL(fn, sec, rate){
+  const n = Math.floor(sec*rate), b = new DataView(new ArrayBuffer(44 + n*2));
+  const w = (o, t) => { for(let i = 0; i < t.length; i++) b.setUint8(o + i, t.charCodeAt(i)); };
+  w(0,"RIFF"); b.setUint32(4, 36 + n*2, true); w(8,"WAVEfmt "); b.setUint32(16,16,true); b.setUint16(20,1,true); b.setUint16(22,1,true);
+  b.setUint32(24,rate,true); b.setUint32(28,rate*2,true); b.setUint16(32,2,true); b.setUint16(34,16,true); w(36,"data"); b.setUint32(40,n*2,true);
+  for(let i = 0; i < n; i++) b.setInt16(44 + i*2, Math.max(-1, Math.min(1, fn(i/rate))) * 32767, true);
+  return URL.createObjectURL(new Blob([b.buffer], {type:"audio/wav"}));
+}
+function setupKeep(){
+  if(keepEl) return;
+  try{
+    SILENT_URL = wavURL(() => 0, 1, 8000);
+    ALARM_URL = wavURL(t => {
+      const f = (Math.floor(t/0.22) % 2) ? 620 : 980, a = (t*f) % 1, c = (t*f*1.414) % 1;
+      return 0.45 * ((a < 0.5 ? 1 : -1) + (c*2 - 1)) * ((t % 0.22) < 0.2 ? 1 : 0);
+    }, 0.44, 22050);
+    CHIME_URL = wavURL(t => 0.5 * (t < 0.55 ? Math.exp(-5*t) * Math.sin(2*Math.PI*660*t) : Math.exp(-4*(t-0.55)) * Math.sin(2*Math.PI*880*(t-0.55))), 1.8, 22050);
+    // かたい通知の音: ちょっとだけ怖い、下がる2音を、3回
+    FIRM_URL = wavURL(t => { const k = Math.floor(t/0.9), u = t - k*0.9; if(k > 2 || u > 0.7) return 0;
+      const f = u < 0.35 ? 880 : 622, v = u < 0.35 ? u : u - 0.35, ph = (t*f) % 1; return 0.55 * (4*Math.abs(ph - 0.5) - 1) * Math.exp(-3*v); }, 2.7, 22050);
+    keepEl = new Audio(); keepEl.loop = true; keepEl.src = SILENT_URL; keepEl.setAttribute("playsinline","");
+    if("mediaSession" in navigator){
+      navigator.mediaSession.metadata = new MediaMetadata({title:"おはよう地震速報", artist:"監視中"});
+      ["play","pause"].forEach(a => { try{ navigator.mediaSession.setActionHandler(a, () => playKeep()); }catch(e){} });
+    }
+  }catch(e){ keepEl = null; }
+}
+function playKeep(){ if(keepEl){ try{ const p = keepEl.play(); if(p && p.catch) p.catch(() => {}); }catch(e){} } }
+async function reviveAudio(){
+  // 眠って止まった(または壊れた)音の仕組みを、作り直す
+  playKeep();
+  if(!ctx || ctx.state === "running") return;
+  try{ await ctx.resume(); }catch(e){}
+  if(ctx.state !== "running"){
+    try{ ctx.close(); }catch(e){}
+    const AC = window.AudioContext || window.webkitAudioContext;
+    try{ ctx = new AC(); await ctx.resume(); }catch(e){}
+  }
+}
+function webBeepStart(){ if(ctx && ctx.state !== "running") ctx.resume(); beep(); beepTimer = setInterval(beep, 220); }
+function startAlarm(){
+  stopAlarm();
+  try{ if(navigator.vibrate) navigator.vibrate([500,200,500,200,500,200,500]); }catch(e){}
+  let viaEl = false;
+  if(keepEl){
+    try{
+      keepEl.onended = null; keepEl.src = ALARM_URL; keepEl.loop = true; keepEl.volume = 1;
+      const pr = keepEl.play(); viaEl = true; alarmOnEl = true;
+      if(pr && pr.catch) pr.catch(() => { if(alarmOnEl){ alarmOnEl = false; webBeepStart(); } });
+      setTimeout(() => { if(alarmOnEl && keepEl.paused){ alarmOnEl = false; webBeepStart(); } }, 700);
+    }catch(e){ viaEl = false; alarmOnEl = false; }
+  }
+  if(!viaEl) webBeepStart();
+}
+function stopAlarm(){
+  if(beepTimer){ clearInterval(beepTimer); beepTimer = null; }
+  if(alarmOnEl && keepEl){ alarmOnEl = false; keepEl.src = SILENT_URL; playKeep(); }
+  try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
+}
+
+function advice(r, li){
+  if(li === null) return "あなたの地域は、強い揺れの予想はありません。ただし、揺れを感じたら、すぐに頭を守ってください。";
+  const strong = li >= 7 ? "強い揺れです。" : "";
+  if(r <= 0) return strong + "すでに揺れが来ている可能性があります。頭を守り、動かないでください。";
+  if(r <= 5) return strong + "今すぐ、枕で頭を守って、動かないでください。";
+  if(r <= 25) return strong + "枕で頭を守りながら、近くに丈夫な机があれば、その下に入ってください。";
+  if(r < 40) return strong + "足元に気をつけて、ドアを開けて出口を確保してください。そのあと、丈夫な机の下で頭を守ってください。";
+  return strong + "間に合います。足元に気をつけて、外へ逃げてください。建物や塀、ガラスから離れた、広い場所へ行ってください。";
+}
+function speak(){
+  if(!scene) return;
+  const s = scene, adv = advice(s.noEta ? 20 : remain, s.li);
+  let t = "";
+  if(s.li !== null && !s.noEta) t += remain <= 0 ? "すでに、揺れが来ている可能性があります。" : "あと" + remain + "秒。";
+  t += adv + "地震の速報です。";
+  if(s.li !== null) t += "あなたの地域、" + selectedArea + "の予想震度は、" + (s.localSpeak || LV[s.li]) + "です。";
+  t += (s.maxIdx >= 0 ? "速報の対象地域での最大予想震度は、" + LV[s.maxIdx] + "です。" : "最大予想震度は不明です。") + (s.src ? "震源は、" + s.src + "です。" : "") + (Number.isFinite(s.magnitude) && s.magnitude > 0 ? "マグニチュードは、" + s.magnitude.toFixed(1) + "と推定されています。" : "") + (s.demo ? "これはデモです。" : "");
+  say(t);
+}
+function say(t){
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = "ja-JP"; u.rate = 1.2;
+    const v = speechSynthesis.getVoices().find(x => (x.lang || "").replace("_","-").startsWith("ja"));
+    if(v) u.voice = v;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function secondsLeft(){ return Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000)); }
+function paintAlertCountdown(){
+  if(!scene || $("alert").hidden) return;
+  const el = $("alert-count");
+  el.hidden = scene.li === null;
+  if(el.hidden) return;
+  if(scene.noEta){ el.textContent = "揺れの到達時刻は不明"; return; }
+  const n = secondsLeft();
+  el.innerHTML = n > 0 ? '揺れまで あと <b id="alert-seconds">' + n + '</b> 秒' : 'すでに揺れが来ている可能性があります';
+}
+function stopAlertCountdown(){ clearInterval(alertTimer); alertTimer = null; }
+function paint(){
+  const s = scene;
+  remain = s.noEta ? 0 : secondsLeft();
+  $("do").textContent = advice(s.noEta ? 20 : remain, s.li);
+  $("countbox").hidden = (s.li === null || s.noEta);
+  if($("n")) $("n").textContent = remain;
+  if(remain <= 0 && s.li !== null && !s.noEta) $("countbox").textContent = "すでに揺れが来ている可能性があります";
+  else if(!$("n")) $("countbox").innerHTML = '揺れまで 約 <b id="n">' + remain + '</b> 秒';
+}
+
+function magnitudeLabel(x){ return Number.isFinite(x.magnitude) && x.magnitude > 0 ? "M " + x.magnitude.toFixed(1) : "不明"; }
+function localLabel(x){ return x.li === null ? "強い揺れの予想なし" : (x.localText || "震度" + LV[x.li]); }
+function etaNow(x){ return x.arrMs ? Math.max(0, Math.round((x.arrMs - Date.now())/1000)) : x.eta; }
+function fillAlert(x){
+  $("a-local").textContent = localLabel(x);
+  $("alert-area").textContent = (x.demo && !x.live) ? "千葉県にいる場合のデモ" : selectedArea;
+  $("a-japan").textContent = x.maxIdx < 0 ? "不明" : "震度" + LV[x.maxIdx];
+  $("a-mag").textContent = magnitudeLabel(x);
+  $("alert-title").textContent = x.demo ? "地震の速報(デモ)" : "緊急地震速報";
+  $("alert-number").textContent = x.reportNo ? "第" + x.reportNo + "報" : "報数不明";
+}
+function fillReport(x){
+  $("r-local").textContent = localLabel(x);
+  $("report-area").textContent = (x.demo && !x.live) ? "千葉県にいる場合のデモ" : selectedArea;
+  $("r-japan").textContent = x.maxIdx < 0 ? "不明" : "震度" + LV[x.maxIdx];
+  $("r-src").textContent = x.src || "調査中";
+  $("r-mag").textContent = magnitudeLabel(x);
+  $("rep-number").textContent = x.reportNo ? "第" + x.reportNo + "報" : "報数不明";
+}
+function showAlert(x){ $("night-clock").hidden = true; hideFirm(); firmState = null; hideSoft();
+  $("alert-change").textContent = ""; $("rep-change").textContent = "";
+  stopAlertCountdown(); clearInterval(countTimer);
+  scene = x;
+  deadlineMs = x.arrMs || (x.noEta ? 0 : Date.now() + x.eta * 1000);
+  fillAlert(x); $("alert").hidden = false;
+  paintAlertCountdown();
+  alertTimer = setInterval(paintAlertCountdown, 250);
+  startAlarm();
+}
+function clearDemo(){ demoTimers.forEach(clearTimeout); demoTimers = []; demoActive = false; }
+function sim(x){
+  clearDemo(); demoActive = true;
+  x.reportNo = 1; x.demo = true;
+  showAlert(x);
+  // 続報デモ: 第2報以降の予想震度が自動的に変わる
+  const sequence = [Math.min(9,x.maxIdx+1), Math.max(5,x.maxIdx-1), x.maxIdx];
+  sequence.forEach((level,i) => {
+    demoTimers.push(setTimeout(() => {
+      if(!demoActive || !scene || !scene.demo) return;
+      const next = {...scene, maxIdx:level, reportNo:i+2, magnitude:Number((scene.magnitude + [0.2,-0.1,0.1][i]).toFixed(1))};
+      if(scene.li !== null) {
+        next.li = Math.min(9,Math.max(5,scene.li + (level-scene.maxIdx)));
+        next.localText = ""; next.localSpeak = "";
+      }
+      updateScene(next);
+    },(i+1)*6000));
+  });
+}
+$("start").addEventListener("click", () => {
+  try{ if(navigator.audioSession) navigator.audioSession.type = "playback"; }catch(e){}
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(AC && !ctx) ctx = new AC();
+  if(ctx && ctx.state !== "running") ctx.resume();
+  watching = true; setupKeep(); restoreSilent();      // 前回の警報音やチャイムが残っていても、必ず無音から始める
+   $("watch-area").textContent=selectedArea; show("watching"); takeLock(); connect();
+});
+$("stop").addEventListener("click", () => {
+  clearDemo(); watching = false; liveId = null; scene = null; stopAlarm(); stopAlertCountdown(); clearInterval(countTimer); $("alert").hidden = true; if(!$("region-slot").hidden) $("change-region").click(); disconnect(); hideTsunami(); hideSoft(); hideFirm(); firmState = null; if(keepEl){ alarmOnEl = false; try{ keepEl.onended = null; keepEl.src = SILENT_URL; keepEl.pause(); }catch(e){} } if(TEST) setMode(false);
+  if(lock){ lock.release().catch(()=>{}); lock = null; }
+  show("idle");
+});
+$("ack").addEventListener("click", () => {
+  stopAlarm(); stopAlertCountdown(); $("alert").hidden = true;
+  if(!scene){ show("watching"); return; }
+  remain = scene.noEta ? 0 : secondsLeft();
+  $("countbox").innerHTML = '揺れまで 約 <b id="n"></b> 秒';
+  fillReport(scene);
+  $("rep-title").textContent = scene.demo ? "地震の内容(デモ)" : "地震の内容";
+  paint(); show("report"); speak();
+  clearInterval(countTimer);
+  countTimer = setInterval(paint, 250);
+});
+$("again").addEventListener("click", speak);
+$("back").addEventListener("click", () => { clearDemo(); speechSynthesis.cancel(); clearInterval(countTimer); show("watching"); });
+
+/* ===== 本番: P2P地震情報 WebSocket(緊急地震速報・警報) ===== */
+let TEST = location.hash === "#test";   // 起動時は本番。#test を付けるか、画面のボタンでテストに切り替える
+const wsUrl = () => TEST ? "wss://api-realtime-sandbox.p2pquake.net/v2/ws" : "wss://api.p2pquake.net/v2/ws";
+let ws = null, wsTimer = null, retry = 0, lastMsg = 0, liveId = null, liveAt = 0;
+const seen = new Set();
+
+const jst = t => {
+  if(typeof t !== "string" || !t.trim()) return NaN;
+  const v = t.trim().replace(/\//g,"-").replace(" ","T");
+  return new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(v) ? v : v + "+09:00").getTime();
+};
+const idxOf = v => v >= 70 ? 9 : v >= 60 ? 8 : v >= 55 ? 7 : v >= 50 ? 6 : v >= 45 ? 5 : v >= 40 ? 4 : v >= 30 ? 3 : v >= 20 ? 2 : v >= 10 ? 1 : v >= 0 ? 0 : -1;
+// 99 は「以上」であり、震度7と断定できないため上限の表示には使用しない。
+const validScale = n => [0,10,20,30,40,45,50,55,60,70].includes(Number(n));
+const normalizeArea = n => String(n || "").normalize("NFKC").replace(/\s+/g, "").replace(/ヶ/g,"ケ");
+function arrivalOf(t, m){
+  // 到達時刻は「日付つき」でも「時刻だけ」でも読めるようにする
+  if(typeof t === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(t.trim())){
+    const ref = String((m.issue && m.issue.time) || m.time || ""), r = jst(ref);
+    let hms = t.trim(); if(hms.length <= 5) hms += ":00";
+    let v = jst(ref.slice(0,10) + " " + hms);
+    if(Number.isFinite(v) && Number.isFinite(r) && v < r - 3600000) v += 86400000;
+    return v;
+  }
+  return jst(t);
+}
+function fromEEW(m){
+  const e = m.earthquake || {}, h = e.hypocenter || {}, areas = Array.isArray(m.areas) ? m.areas : [];
+  let maxIdx = -1, local = null;
+  const prefN = normalizeArea(selectedPref), core = t => t.replace(/[都道府県]$/,"");
+  const strip = n => n.startsWith(prefN) ? n.slice(prefN.length) : n;
+  const target = strip(normalizeArea(selectedArea));
+  // 県名の有無・「千葉」「千葉県」の違いがあっても、同じ地域として照合する
+  const matches = a => {
+    const name = normalizeArea(a.name), ap = core(normalizeArea(a.pref));
+    const samePref = ap ? ap === core(prefN) : name.startsWith(core(prefN));
+    if(!samePref) return false;
+    return selectedArea === selectedPref || strip(name) === target;
+  };
+  areas.forEach(a => {
+    const from = validScale(a.scaleFrom) ? idxOf(Number(a.scaleFrom)) : -1;
+    const to = validScale(a.scaleTo) ? idxOf(Number(a.scaleTo)) : -1;
+    maxIdx = Math.max(maxIdx, from, to);
+    if(matches(a)) {
+      const oldUpper = local ? Math.max(validScale(local.scaleFrom) ? idxOf(Number(local.scaleFrom)) : -1,validScale(local.scaleTo) ? idxOf(Number(local.scaleTo)) : -1) : -1;
+      if(!local || Math.max(from,to) > oldUpper) local = a;
+    }
+  });
+  let li = null, localText = "", localSpeak = "";
+  if(local){
+    const lo = validScale(local.scaleFrom) ? idxOf(Number(local.scaleFrom)) : -1;
+    const up = validScale(local.scaleTo) ? idxOf(Number(local.scaleTo)) : -1;
+    const upperUnbounded = Number(local.scaleTo) === 99;
+    li = Math.max(lo,up);
+    if(li < 0) li = null;
+    if(li !== null){
+      if(upperUnbounded){ localText = "震度" + LV[li] + "以上"; localSpeak = LV[li] + "以上"; }
+      else if(lo >= 0 && up > lo){ localText = "震度" + LV[lo] + "〜" + LV[up]; localSpeak = LV[lo] + "から" + LV[up]; }
+      else { localText = "震度" + LV[li]; localSpeak = LV[li]; }
+    }
+  }
+  // P2P地震情報 code 556 の areas[].arrivalTime のみを採用。
+  // kindCode 11 は到達済み、19 は到達予想なし。いずれも架空の秒数を出さない。
+  // kindCode 11: すでに主要動が到達したと予測 / 19: 到達時刻の予想なし
+  const kind = local ? String(local.kindCode || "") : "";
+  let arrMs = local && kind !== "19" ? arrivalOf(local.arrivalTime, m) : NaN;
+  // テスト用サーバーは、昔の地震の使い回し(時刻が過去)なので、テストの間だけ、受信した時刻に合わせて、ずらして表示する
+  const shift = TEST && m.issue ? jst(m.time) - jst(m.issue.time) : 0;
+  if(Number.isFinite(shift) && Number.isFinite(arrMs)) arrMs += shift;
+  if(local && kind === "11") arrMs = Date.now();
+  const ok = Number.isFinite(arrMs) && arrMs > 0;
+  return {src:h.name || h.reduceName || "", maxIdx, li, localText, localSpeak,
+    arrMs:ok ? arrMs : 0, noEta:!ok, demo:TEST || !!m._fake, live:true,
+    magnitude:Number.isFinite(Number(h.magnitude)) && Number(h.magnitude)>0 ? Number(h.magnitude):null,
+    reportNo:Number(m.issue && m.issue.serial) || null,
+    originMs:jst(m.earthquake && m.earthquake.originTime)};
+}
+
+function announceChange(old, next){
+  const oldLabel = localLabel(old);
+  const newLabel = localLabel(next);
+  const localChanged = oldLabel !== newLabel;
+  const maxChanged = old.maxIdx !== next.maxIdx;
+  const message = localChanged ? "地域の予想震度が変わりました。" + newLabel : maxChanged ? "全国の最大予想震度が変わりました。震度"+LV[next.maxIdx] : "";
+  $("alert-change").textContent = message;
+  $("rep-change").textContent = message;
+  // 予想震度の変更は画面だけで通知し、自動音声読み上げはしない。
+}
+function updateScene(next){
+  const old = scene;
+  if(!old) return showAlert(next);
+  // 続報の到達時刻が不明なら、古い時刻を新しい予想として表示しない。
+  deadlineMs = (next.demo && !next.live) ? deadlineMs : (next.arrMs || 0);
+  scene = next;
+  announceChange(old,next);
+  if($("alert").hidden){
+    // 警報の画面を閉じたあと(レポートを見ている間や、監視に戻ったあと)でも、
+    // 続報で、自分の地域の予想が強まったら、もう一度、警報音で知らせる
+    const ser = v => v !== null && v >= 4;
+    const worse = ser(next.li) && (!ser(old.li) || next.li > old.li);
+    if(worse && watching){
+      showAlert(next);
+      $("alert-change").textContent = "続報で、あなたの地域の予想が強まりました。";
+      return;
+    }
+    if($("report").hidden) return;
+  }
+  if(!$("alert").hidden){ fillAlert(next); paintAlertCountdown(); }
+  if(!$("report").hidden){ fillReport(next); paint(); }
+}
+const latestSerial = new Map();
+const cancelledEvents = new Set();
+function onEEW(m){
+  if(!watching || (m.test && !TEST)) return;
+  if(m.id){ if(seen.has(m.id)) return; seen.add(m.id); if(seen.size > 500) seen.clear(); }
+  const ev = String((m.issue && m.issue.eventId) || "");
+  const serial = Number(m.issue && m.issue.serial) || 0;
+  const it = jst((m.issue && m.issue.time) || m.time);
+  if(!TEST && (!Number.isFinite(it) || Math.abs(Date.now()-it)>180000)) return;
+  if(ev && cancelledEvents.has(ev)) return;
+  if(ev && serial && serial <= (latestSerial.get(ev) || 0)) return;
+  if(ev && serial) latestSerial.set(ev,serial);
+  if(latestSerial.size > 200) latestSerial.clear();
+  if(m.cancelled){
+    if(ev) cancelledEvents.add(ev);
+    if(firmState && ev && ev === firmState.ev){ firmState = null; hideFirm(); return; }     // かたい通知の地震の取り消し: バーを消すだけ(読み上げなし)
+    if(ev && ev === liveId){
+      clearDemo(); liveId = null; stopAlarm(); stopAlertCountdown(); clearInterval(countTimer);
+      $("alert").hidden = true; scene = null; show("watching");
+      $("connmsg").textContent = "緊急地震速報は取り消されました";
+      try{ speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance("緊急地震速報は取り消されました。"); u.lang = "ja-JP"; speechSynthesis.speak(u); }catch(e){}
+    }
+    return;
+  }
+  const x = fromEEW(m);
+  const serious = x.li !== null && x.li >= 4;
+  // かたい通知中の地震の続報: バーを更新する。自分の地域が震度4以上になったら、警報にする
+  if(firmState && ev && ev === firmState.ev){
+    if(serious){
+      firmState = null; scene = x; liveId = ev; liveAt = Date.now(); showAlert(x);
+      $("alert-change").textContent = "続報で、あなたの地域の予想が強まりました。";
+    }else if($("alert").hidden && !firmState.closed) showFirm(x, false);
+    return;
+  }
+  if(ev && ev === liveId && scene && scene.live){ updateScene(x); return; }
+  // 別地震の続報で表示中の警報を上書きしない。新規の地震（第1報）は表示可能。
+  if(liveId && ev && ev !== liveId && serial > 1 && Date.now() - liveAt < 600000) return;
+  clearDemo();
+  // かたい通知: オンのとき、自分の地域が震度4以上でなければ、警報音は鳴らさない
+  if(firmOn && !serious){
+    if(!$("alert").hidden) return;                 // 警報の画面が出ている間は、そちらを優先する
+    firmState = {ev: ev || ("unknown-" + Date.now()), closed:false};
+    showFirm(x, true); return;
+  }
+  liveId = ev || ("unknown-" + Date.now()); liveAt = Date.now();
+  showAlert(x);
+}
+
+function setConn(ok, msg){ $("dot").className = "dot" + (ok ? "" : " off"); $("connmsg").textContent = msg; }
+let nextWs = null, swapTimer = 0, noOverlap = false, lostAt = 0, overlapFails = 0, stableTimer = 0, lastBackfill = 0;
+function onWsMessage(ev){
+  if(!watching) return;
+  lastMsg = Date.now();
+  let m; try{ m = JSON.parse(ev.data); }catch(e){ return; }
+  if(!m.id && m._id) m.id = m._id;                 // 受信した速報の通し番号(重複を除くために使う)
+  counts[m.code] = (counts[m.code] || 0) + 1;
+  if(m.code === 556 || m.code === 552 || m.code === 551) keepRaw(m.code, ev.data); else schedRaw();
+  if(m.code === 556) onEEW(m); else if(m.code === 552) onTsunami(m); else if(m.code === 551) onQuakeInfo(m);
+  setConn(true, "監視中 最終受信 " + new Date().toLocaleTimeString("ja-JP") + (TEST ? " [テスト]" : ""));
+}
+function attach(sock){
+  sock.onmessage = onWsMessage;
+  sock.onerror = () => { if(sock === ws) setConn(false, "通信エラー・再接続待ち"); };
+  sock.onclose = () => { if(sock === ws && watching){ clearTimeout(stableTimer); if(!lostAt) lostAt = Date.now(); retryLater(); } };
+}
+function connect(){
+  clearTimeout(wsTimer);
+  if(ws && ws.readyState <= 1) return;
+  setConn(false, "接続中…");
+  let sock; try{ sock = new WebSocket(wsUrl()); }catch(e){ retryLater(); return; }
+  ws = sock; attach(sock);
+  sock.onopen = () => {
+    if(!watching){ sock.close(); return; }
+    lastMsg = Date.now(); setConn(true, "監視中(受信待ち)" + (TEST ? " [テスト]" : ""));
+    clearTimeout(stableTimer); stableTimer = setTimeout(() => { retry = 0; }, 30000);     // 30秒つながり続けたら、待ち時間を元に戻す
+    scheduleSwap();
+    if(lostAt){ lostAt = 0; backfill(); }          // 切れていた間に出た速報を、あとから拾う
+  };
+}
+// P2Pは、接続を約10分で強制的に切る。切れる前(8分半)に、新しい接続を先に作って、つながってから古い方を閉じる。
+// 同時接続が断られたら、重ねる方法はあきらめて、切れたらすぐつなぎ直す方法だけにする。
+function scheduleSwap(){ clearTimeout(swapTimer); if(!noOverlap) swapTimer = setTimeout(swapConnection, 510000); }
+function swapConnection(){
+  if(!watching || !ws || ws.readyState !== 1 || nextWs) return;
+  let n; try{ n = new WebSocket(wsUrl()); }catch(e){ overlapFailed(); return; }
+  nextWs = n; n.onmessage = onWsMessage;
+  const giveUp = setTimeout(() => { if(nextWs === n){ nextWs = null; overlapFailed(); try{ n.close(); }catch(e){} } }, 8000);
+  n.onerror = n.onclose = () => { if(nextWs === n){ nextWs = null; clearTimeout(giveUp); overlapFailed(); } };
+  n.onopen = () => {
+    clearTimeout(giveUp);
+    if(!watching || nextWs !== n){ try{ n.close(); }catch(e){} return; }
+    const old = ws; nextWs = null; ws = n; lastMsg = Date.now(); overlapFails = 0; attach(n);
+    if(old){ old.onclose = null; old.onerror = null; try{ old.close(); }catch(e){} }
+    scheduleSwap();
+    if(lostAt){ lostAt = 0; backfill(); }
+  };
+}
+function overlapFailed(){
+  // 重ねる接続が、2回続けて失敗したら、あきらめる(同時接続の制限かもしれない)。1回目は、45秒後にもう一度試す。
+  overlapFails++;
+  if(overlapFails >= 2) noOverlap = true;
+  else if(watching && ws && ws.readyState === 1){ clearTimeout(swapTimer); swapTimer = setTimeout(swapConnection, 45000); }
+}
+function retryLater(){
+  setConn(false, "つながっていません。再接続します…");
+  clearTimeout(wsTimer);
+  const d = retry === 0 ? 300 : Math.min(60000, 3000 * Math.pow(2, retry - 1)); retry++;   // 最初は、すぐ(0.3秒)。続けて失敗したら、間隔を延ばす
+  wsTimer = setTimeout(connect, d);
+}
+// 切れていた間の警報・津波を、P2Pの履歴から拾う。重複は、報の番号と通し番号で除く。取得できなくても、何も起きない。
+async function backfill(){
+  if(TEST || !watching) return;
+  if(Date.now() - lastBackfill < 20000) return;      // P2Pの制限(履歴は1分に60回まで)を、大きく下回る頻度に抑える
+  lastBackfill = Date.now();
+  try{
+    const rs = await Promise.all([556, 552].map(c => fetch("https://api.p2pquake.net/v2/history?codes=" + c + "&limit=5", {cache:"no-store"}).then(r => r.ok ? r.json() : []).catch(() => [])));
+    rs.forEach((list, i) => { if(Array.isArray(list)) list.slice().reverse().forEach(m => {
+      if(!m.id && m._id) m.id = m._id;
+      if(i === 0) onEEW(m); else onTsunami(m);
+    }); });
+  }catch(e){}
+}
+function disconnect(){
+  clearTimeout(wsTimer); wsTimer = null; clearTimeout(swapTimer); clearTimeout(stableTimer); lostAt = 0; noOverlap = false; overlapFails = 0;
+  [ws, nextWs].forEach(x => { if(x){ x.onclose = null; x.onerror = null; try{ x.close(); }catch(e){} } });
+  ws = null; nextWs = null; setConn(false,"監視停止中");
+}
+setInterval(() => {
+  if(!watching) return;
+  if(ws && ws.readyState === 1 && Date.now() - lastMsg > 600000) ws.close();
+  if(keepEl && keepEl.paused && !alarmOnEl && keepEl.src === SILENT_URL) playKeep();
+  const bad = !!ctx && ctx.state !== "running";
+  $("audiomsg").hidden = !bad;
+  if(bad){ $("audiomsg").textContent = "音が出ない状態です。画面を一度タップしてください。"; try{ ctx.resume(); }catch(e){} }
+}, 15000);
+document.addEventListener("pointerdown", () => { if(watching) reviveAudio(); }, {passive:true});
+
+/* ===== 津波(P2P地震情報 code 552) ===== */
+const TSU = {MajorWarning:["大津波警報",3], Warning:["津波警報",2], Watch:["津波注意報",1]};
+let tsuRank = 0, tsuText = "", tsuAlarm = false;
+function hideTsunami(){
+  $("tsu").hidden = true; tsuRank = 0; tsuText = "";
+  if(tsuAlarm && $("alert").hidden) stopAlarm();      // 津波の警報音が鳴っていたなら、バーと一緒に止める
+  tsuAlarm = false;
+}
+function onTsunami(m){
+  if(!watching || (m.test && !TEST)) return;
+  if(m.id){ if(seen.has(m.id)) return; seen.add(m.id); }
+  const it = jst((m.issue && m.issue.time) || m.time);
+  if(!TEST && (!Number.isFinite(it) || Math.abs(Date.now()-it) > 180000)) return;
+  if(m.cancelled){ hideTsunami(); return; }
+  const prefN = normalizeArea(selectedPref), core = t => t.replace(/[都道府県]$/,"");
+  const bay = ["千葉県","東京都","神奈川県"].includes(selectedPref);
+  const mine = (Array.isArray(m.areas) ? m.areas : []).filter(a => {
+    const n = normalizeArea(a.name);
+    return TSU[a.grade] && (n.startsWith(prefN) || n.startsWith(core(prefN)) || (bay && n.startsWith("東京湾")));
+  });
+  if(!mine.length){ hideTsunami(); return; }
+  let rank = 0; const names = [];
+  mine.forEach(a => { rank = Math.max(rank, TSU[a.grade][1]); names.push(a.name); });
+  const label = Object.values(TSU).find(v => v[1] === rank)[0];
+  const act = rank >= 2 ? "海岸や川の近くにいる人は、すぐに、高いところへ避難してください。" : "海の中にいる人は、すぐに上がって、海岸から離れてください。";
+  tsuText = label + "が出ています。対象は、" + names.join("、") + "です。" + act;
+  $("tsu-text").textContent = tsuText; $("tsu").hidden = false;
+  if(rank > tsuRank && $("alert").hidden){ startAlarm(); tsuAlarm = true; }
+  tsuRank = rank;
+}
+$("tsu-ok").addEventListener("click", () => { stopAlarm(); tsuAlarm = false; say(tsuText); });
+$("test-sound").addEventListener("click", () => {
+  if(ctx && ctx.state !== "running") ctx.resume();
+  beep(); setTimeout(beep, 240); setTimeout(beep, 480);
+  say("音のテストです。この声が聞こえていれば、警報は鳴ります。");
+});
+
+/* ===== 擬似速報(P2Pのテスト用サーバーが556を流さないときの代わり) ===== */
+let fake = {ev:"", serial:0};
+const jstStr = ms => new Date(ms + 9*3600e3).toISOString().slice(0,19).replace("T"," ").replace(/-/g,"/");
+const bump = v => v >= 60 ? 70 : v === 55 ? 60 : v === 50 ? 55 : 50;   // 全国の最大震度を、自分の地域より1段階強くする
+function fakeMsg(o){
+  const t = Date.now(), name = selectedArea === selectedPref ? ((REGIONS[selectedPref] || [])[0] || selectedPref) : selectedArea;
+  return {code:556, id:"fake" + t + Math.random(), test:false, _fake:true, cancelled:!!o.cancel,
+    issue:{time:jstStr(t), eventId:fake.ev, serial:String(fake.serial)},
+    earthquake:{originTime:jstStr(t-8000), hypocenter:{name:(selectedArea === selectedPref ? selectedPref : selectedArea) + "付近(擬似)", depth:40, magnitude:o.mag || 6.8}},
+    areas: o.cancel ? [] : [
+      {pref:selectedPref, name:name, scaleFrom:o.from, scaleTo:o.to, kindCode:o.kind || "10", arrivalTime:jstStr(t + (o.sec||0)*1000)},
+      {pref:"擬似", name:"擬似の別の地域", scaleFrom:bump(o.from), scaleTo:bump(o.to), kindCode:"10", arrivalTime:jstStr(t + 3000)}]};
+}
+function fakeStart(sec, from, to, kind){ fake = {ev:"fake-" + Date.now() + "-" + Math.random().toString(36).slice(2,8), serial:1}; onEEW(fakeMsg({sec, from, to, kind})); }
+$("fk1").addEventListener("click", () => fakeStart(25, 50, 55));
+$("fk2").addEventListener("click", () => fakeStart(70, 45, 50));
+$("fk3").addEventListener("click", () => fakeStart(0, 55, 60, "11"));
+$("fk5").addEventListener("click", () => { if(!fake.ev) return; fake.serial++; onEEW(fakeMsg({cancel:true})); });
+const fakeTsu = o => onTsunami(Object.assign({code:552, id:"ft" + Date.now() + Math.random(), issue:{time:jstStr(Date.now())}}, o));
+$("fk6").addEventListener("click", () => fakeTsu({areas:[{grade:"Warning", name:selectedPref + "沿岸(擬似)"}]}));
+$("fk7").addEventListener("click", () => fakeTsu({cancelled:true, areas:[]}));
+const counts = {}; let rawTimer = 0;
+function schedRaw(){ if(!rawTimer) rawTimer = setTimeout(() => { rawTimer = 0; showRaw(); }, 1000); }
+function keepRaw(code, t){
+  try{ const o = JSON.parse(localStorage.getItem("eew-raw2") || "{}"); o[code] = String(t).slice(0, 3000); localStorage.setItem("eew-raw2", JSON.stringify(o)); }catch(e){}
+  schedRaw();
+}
+function showRaw(){
+  let o = {}; try{ o = JSON.parse(localStorage.getItem("eew-raw2") || "{}"); }catch(e){}
+  const c = Object.keys(counts).sort().map(k => k + ": " + counts[k] + "件").join(" / ") || "(まだ受信していません)";
+  $("raw").value = "今回の受信数(コード: 件数)\n" + c + "\n\n" + [556, 552, 551].map(k => "【" + k + "】最後に受信したもの\n" + (o[k] || "(まだありません)")).join("\n\n");
+}
+showRaw();
+
+/* ===== やわらかい通知: 地震情報(code 551)で、どこかで震度3以上があったとき ===== */
+let softOn = true, softTimer = 0, lastQuake = {t:0};
+try{ softOn = localStorage.getItem("eew-soft") !== "off"; }catch(e){}
+function setSoft(on){
+  softOn = !!on;
+  try{ localStorage.setItem("eew-soft", softOn ? "on" : "off"); }catch(e){}
+  $("soft-btn").textContent = softOn ? "やわらかい通知(震度3以上の地震情報): オン(押すとオフ)" : "やわらかい通知(震度3以上の地震情報): オフ(押すとオン)";
+  if(!softOn) hideSoft();
+}
+function hideSoft(){ $("soft").hidden = true; clearTimeout(softTimer); }
+function softBeep(){
+  if(!ctx || ctx.state !== "running") return;
+  const t0 = ctx.currentTime;
+  [660, 880].forEach((hz, i) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), at = t0 + i*0.5;
+    o.type = "sine"; o.frequency.value = hz;
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.2, at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.9);
+    o.connect(g); g.connect(ctx.destination); o.start(at); o.stop(at + 1);
+  });
+}
+function restoreSilent(){ if(!keepEl) return; keepEl.onended = null; keepEl.loop = true; keepEl.volume = 1; keepEl.src = SILENT_URL; playKeep(); }
+function playChime(url, vol){
+  url = url || CHIME_URL; vol = vol || 0.5;
+  if(alarmOnEl || beepTimer || !$("alert").hidden) return;       // 警報が優先
+  if(keepEl && url){
+    try{
+      keepEl.loop = false; keepEl.volume = vol; keepEl.src = url;
+      keepEl.onended = restoreSilent;
+      setTimeout(() => { if(keepEl && keepEl.src === url && !alarmOnEl) restoreSilent(); }, url === FIRM_URL ? 3200 : 2300);   // 終わりの合図が来なくても、無音の再生に戻す
+      const pr = keepEl.play(); if(pr && pr.catch) pr.catch(() => { softBeep(); restoreSilent(); });
+      return;
+    }catch(e){}
+  }
+  softBeep();
+}
+function softNote(t){
+  const el = $("softmsg");
+  if(el) el.textContent = "地震情報の最後の扱い: " + t + "(" + new Date().toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"}) + ")";
+}
+function onQuakeInfo(m){
+  if(!watching || (m.test && !TEST)) return;
+  if(!softOn){ softNote("やわらかい通知がオフのため、通知なし"); return; }
+  if(m.id){ if(seen.has(m.id)) return; seen.add(m.id); }
+  const e = m.earthquake || {}, h = e.hypocenter || {};
+  const it = jst((m.issue && m.issue.time) || m.time);
+  if(!TEST && !m._fake && (!Number.isFinite(it) || Math.abs(Date.now() - it) > 900000)){ softNote("古い情報のため、通知なし"); return; }
+  const mx = idxOf(e.maxScale);
+  if(mx < 3){ softNote("最大震度が" + (mx >= 0 ? LV[mx] : "不明") + "で、3未満のため、通知なし"); return; }
+  if(!$("alert").hidden){ softNote("警報の表示中のため、通知なし"); return; }
+  const qt = jst(e.time);
+  if(m._fake) lastQuake.t = 0;
+  // 同じ地震の続きの情報は、音を鳴らさない(テストの間は、昔の地震の使い回しなので、毎回鳴らす)
+  const same = !TEST && Number.isFinite(qt) && Math.abs(qt - lastQuake.t) < 120000;
+  if(Number.isFinite(qt)) lastQuake.t = qt;
+  const prefN = normalizeArea(selectedPref), core = t => t.replace(/[都道府県]$/,"");
+  const hhmm = Number.isFinite(qt) ? new Date(qt).toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"}) : "";
+  let txt = "地震情報" + (hhmm ? " " + hhmm : "") + ": " + (h.name || "震源を調査中") + "で、最大震度" + LV[mx] + "。";
+  if(h.magnitude > 0) txt += " M" + Number(h.magnitude).toFixed(1) + "。";
+  const mine = (Array.isArray(m.points) ? m.points : []).filter(q => core(normalizeArea(q.pref || "")) === core(prefN)).map(q => idxOf(q.scale)).filter(v => v >= 0);
+  if(mine.length) txt += " " + selectedPref + "でも、震度" + LV[Math.max(...mine)] + "。";
+  $("soft-text").textContent = txt; $("soft").hidden = false;
+  clearTimeout(softTimer); softTimer = setTimeout(hideSoft, 90000);
+  if(!same) playChime();
+  softNote(same ? "同じ地震の続きの情報のため、バーだけ更新(音なし)" : "最大震度" + LV[mx] + "を通知しました");
+}
+$("soft-btn").addEventListener("click", () => setSoft(!softOn));
+$("soft-x").addEventListener("click", hideSoft);
+$("fk8").addEventListener("click", () => onQuakeInfo({code:551, id:"fq" + Date.now() + Math.random(), _fake:true,
+  issue:{time:jstStr(Date.now()), type:"ScaleAndDestination"},
+  earthquake:{time:jstStr(Date.now() - 60000), maxScale:30, hypocenter:{name:(selectedArea === selectedPref ? selectedPref : selectedArea) + "付近(擬似)", magnitude:4.2, depth:30}},
+  points:[{pref:selectedPref, addr:"擬似の観測点", scale:30}]}));
+setSoft(softOn);
+
+/* ===== かたい通知: 自分の地域が震度4以上でない警報(code 556)を、赤いバーと短い音で知らせる ===== */
+let firmOn = false, firmTimer = 0, firmState = null;
+try{ firmOn = localStorage.getItem("eew-firm") === "on"; }catch(e){}
+function setFirm(on){
+  firmOn = !!on;
+  try{ localStorage.setItem("eew-firm", firmOn ? "on" : "off"); }catch(e){}
+  $("firm-btn").textContent = firmOn ? "かたい通知(自分の地域が震度4以上でない警報): オン(押すとオフ)" : "かたい通知(自分の地域が震度4以上でない警報): オフ(押すとオン)";
+  if(!firmOn){ hideFirm(); firmState = null; }
+}
+function hideFirm(){ $("firm").hidden = true; clearTimeout(firmTimer); }
+function closeFirm(){ hideFirm(); if(firmState) firmState.closed = true; }      // 閉じたあとの続報では、バーを出し直さない(警報への切り替えは別)
+function showFirm(x, first){
+  const hhmm = Number.isFinite(x.originMs) ? new Date(x.originMs).toLocaleTimeString("ja-JP", {hour:"2-digit", minute:"2-digit", hourCycle:"h23"}) : "";
+  let t = "緊急地震速報 " + (x.reportNo ? "第" + x.reportNo + "報" : "報数不明") + (hhmm ? " " + hhmm : "") + ": " + (x.src || "震源を調査中") + "で、" + (x.maxIdx >= 0 ? "最大予想震度" + LV[x.maxIdx] : "最大予想震度は不明") + "。";
+  if(Number.isFinite(x.magnitude) && x.magnitude > 0) t += " M" + x.magnitude.toFixed(1) + "。";
+  t += x.li === null ? " あなたの地域は、震度4以上の予想なし。" : " あなたの地域: " + localLabel(x) + "。";
+  $("firm-text").textContent = t; $("firm").hidden = false;
+  clearTimeout(firmTimer); firmTimer = setTimeout(closeFirm, 180000);
+  if(first) playChime(FIRM_URL, 0.8);                    // 音は、最初の報だけ。読み上げはしない
+}
+$("firm-btn").addEventListener("click", () => setFirm(!firmOn));
+$("firm-x").addEventListener("click", closeFirm);
+setFirm(firmOn);
+const newFakeId = () => "fake-" + Date.now() + "-" + Math.random().toString(36).slice(2,8);
+function fakeOther(o){ const m = fakeMsg(o); m.areas = [m.areas[1]]; m.earthquake.hypocenter.name = "擬似の遠い地域"; return m; }
+$("fk9").addEventListener("click", () => { fake = {ev:newFakeId(), serial:1}; onEEW(fakeOther({sec:30, from:50, to:55})); });
+$("fk10").addEventListener("click", () => { if(!fake.ev) fake = {ev:newFakeId(), serial:0}; fake.serial++; onEEW(fakeOther({sec:30, from:55, to:60, mag:7.1})); });
+$("fk11").addEventListener("click", () => { if(!fake.ev) fake = {ev:newFakeId(), serial:0}; fake.serial++; onEEW(fakeMsg({sec:20, from:40, to:99, mag:7.1})); });
+
+/* ===== ヘルプ ===== */
+$("help-open").addEventListener("click", () => { $("help").hidden = false; $("help").scrollTop = 0; });
+$("help-close").addEventListener("click", () => { $("help").hidden = true; });
+
+/* ===== 本番 / テストの切り替え(安全のため、再起動や「監視をやめる」で、必ず本番に戻る) ===== */
+function setMode(test){
+  TEST = !!test;
+  $("mode-btn").textContent = TEST ? "接続先: テスト(押すと本番に戻す)" : "接続先: 本番(押すとテストに切り替え)";
+  $("testwarn").hidden = !TEST;
+  clearDemo(); stopAlarm(); stopAlertCountdown(); clearInterval(countTimer);
+  $("alert").hidden = true; scene = null; liveId = null;
+  seen.clear(); latestSerial.clear(); cancelledEvents.clear(); hideTsunami(); hideSoft(); hideFirm(); firmState = null; lastQuake.t = 0; Object.keys(counts).forEach(k => delete counts[k]); showRaw();
+  try{ history.replaceState(null, "", TEST ? "#test" : location.pathname + location.search); }catch(e){}
+  if(watching){ disconnect(); retry = 0; connect(); }
+}
+$("mode-btn").addEventListener("click", () => setMode(!TEST));
+setMode(TEST);
+</script>
+</body>
+</html>
